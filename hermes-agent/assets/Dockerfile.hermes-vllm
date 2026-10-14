@@ -1,0 +1,9 @@
+ARG HERMES_VERSION=X.Y.Z
+FROM hermes-guest:${HERMES_VERSION}
+
+ARG VLLM_VERSION=A.B.C
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends python3-pip \
+ && rm -rf /var/lib/apt/lists/* \
+ && pip install --no-cache-dir vllm==${VLLM_VERSION}
+USER hermes

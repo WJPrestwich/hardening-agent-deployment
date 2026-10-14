@@ -1,0 +1,28 @@
+model:
+  provider: custom
+  base_url: http://172.30.0.1:18790/v1   # ClawShell; the agent holds only the VIRTUAL key
+  default:  openrouter/nous-hermes-2-mixtral   # replace with your provider's model slug
+  api_key:  vk-hermes-001                # virtual key, never the real one
+
+security:
+  redact_secrets: true       # strip key-like patterns from tool output + logs
+  tirith_enabled: true       # content-level pre-execution command scanning
+  tirith_fail_open: false    # CRITICAL: block if Tirith can't scan. Default is true.
+  tirith_timeout: 5
+
+terminal:
+  backend: local             # the Docker container IS the sandbox; keep execution local so
+                             # Tirith stays active. (docker/singularity/modal/daytona backends
+                             # SKIP dangerous-command checks, assuming the container is the boundary.)
+
+website_blocklist:
+  enabled: true
+  domains:                   # example: block common one-shot exfil / paste services
+    - "pastebin.com"
+    - "transfer.sh"
+    - "file.io"
+    - "0x0.st"
+  shared_files: false        # do not let the browser create public share links
+
+privacy:
+  redact_pii: true           # hash user IDs / strip phone numbers from LLM context

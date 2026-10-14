@@ -1,0 +1,56 @@
+version: 1
+mode: balanced              # tune to strict once your allowlist is stable
+enforce: true
+default_agent_identity: "hermes"
+bind_default_agent_identity: true
+
+api_allowlist:
+  - "*.anthropic.com"
+  - "*.openai.com"
+  - "*.openrouter.ai"
+  - "api.minimax.io"
+  - "opencode.ai"
+  - "github.com"
+  - "*.githubusercontent.com"
+  # package registries the agent may need
+  - "registry.npmjs.org"
+  - "pypi.org"
+  - "*.pypi.org"
+  - "files.pythonhosted.org"
+
+fetch_proxy:
+  listen: "172.30.0.1:8888"
+
+forward_proxy:
+  enabled: true
+
+request_body_scanning:
+  enabled: true
+  action: block
+  scan_headers: true
+  header_mode: sensitive
+
+response_scanning:
+  enabled: true
+  action: warn
+  # LLM providers legitimately return instruction-like text, so exempt them
+  # from prompt-injection scanning. Request-side DLP and allowlists still apply.
+  exempt_domains:
+    - "*.anthropic.com"
+    - "*.openai.com"
+
+flight_recorder:
+  enabled: true
+  dir: /var/lib/pipelock/evidence
+  retention_days: 90
+  signing_key_path: /etc/pipelock/pipelock-signing-key
+  require_receipts: true
+  sign_checkpoints: true
+
+emit:
+  instance_id: "hermes-host"
+  syslog:
+    address: "udp://127.0.0.1:514"
+    min_severity: warn
+    facility: local0
+    tag: pipelock

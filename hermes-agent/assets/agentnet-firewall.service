@@ -1,0 +1,14 @@
+[Unit]
+Description=Agentnet egress lockdown
+After=docker.service network-online.target
+Wants=docker.service network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/agentnet-firewall.sh apply
+ExecReload=/usr/local/sbin/agentnet-firewall.sh apply
+ExecStop=/usr/local/sbin/agentnet-firewall.sh clear
+
+[Install]
+WantedBy=multi-user.target

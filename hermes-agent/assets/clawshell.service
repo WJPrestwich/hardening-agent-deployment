@@ -1,0 +1,40 @@
+[Unit]
+Description=ClawShell API proxy daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=clawshell
+Group=clawshell
+ExecStart=/usr/local/bin/clawshell start --config /etc/clawshell/clawshell.toml --foreground
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectKernelLogs=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+ProcSubset=pid
+LockPersonality=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+MemoryDenyWriteExecute=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_INET AF_INET6
+ReadOnlyPaths=/etc/clawshell
+ReadWritePaths=/var/log/clawshell /var/lib/clawshell
+UMask=0077
+StandardOutput=append:/var/log/clawshell/clawshell.log
+StandardError=append:/var/log/clawshell/clawshell.log
+
+[Install]
+WantedBy=multi-user.target

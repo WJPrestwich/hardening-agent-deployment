@@ -1,0 +1,49 @@
+version = "0.2.1"
+log_level = "info"
+
+[server]
+host = "172.30.0.1"     # agentnet bridge gateway
+port = 18790
+
+[upstream]
+openai_base_url     = "https://api.openai.com"
+anthropic_base_url  = "https://api.anthropic.com"
+# Uncomment additional providers as needed:
+# openrouter_base_url = "https://openrouter.ai/api"
+# minimax_base_url    = "https://api.minimax.io"
+# opencode_zen_base_url = "https://opencode.ai/zen"
+
+# Virtual key the AGENT holds; the real key never leaves the host.
+[[keys]]
+virtual_key = "vk-hermes-001"
+real_key    = "sk-ant-REAL-KEY-HERE"
+provider    = "anthropic"
+
+# Additional key mappings can point at different providers:
+# [[keys]]
+# virtual_key = "vk-openrouter-001"
+# real_key    = "sk-or-..."
+# provider    = "openrouter"
+
+# The LLM channel bypasses Pipelock (NO_PROXY), so do content inspection HERE.
+# ClawShell always scans outbound requests; scan_responses controls upstream responses.
+[dlp]
+scan_responses = true
+patterns = [
+  # Cloud / service credentials: block hard
+  { name = "aws_access_key",    regex = 'AKIA[0-9A-Z]{16}',                                 action = "block" },
+  { name = "aws_secret_key",    regex = '\b[A-Za-z0-9/+=]{40}\b',                         action = "block" },
+  { name = "github_token",      regex = 'gh[pousr]_[A-Za-z0-9_]{36,}',                      action = "block" },
+  { name = "slack_token",       regex = 'xox[baprs]-[0-9]{10,13}-[0-9]{10,13}[a-zA-Z0-9-]*', action = "block" },
+  { name = "openai_api_key",    regex = 'sk-[a-zA-Z0-9]{20,}',                              action = "block" },
+  { name = "anthropic_api_key", regex = 'sk-ant-[a-zA-Z0-9]{32,}',                          action = "block" },
+  # Crypto / PKI
+  { name = "private_key",       regex = '-----BEGIN .*PRIVATE KEY-----',                    action = "block" },
+  # PII: redact so the request can still proceed
+  { name = "ssn",               regex = '\b\d{3}-\d{2}-\d{4}\b',                            action = "redact" },
+  { name = "credit_card",       regex = '\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13})\b', action = "redact" },
+  { name = "email",             regex = '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}',  action = "redact" },
+]
+
+[stats]
+persist_path = "/var/lib/clawshell/stats.json"

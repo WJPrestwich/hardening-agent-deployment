@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+HERMES_VERSION="${HERMES_VERSION:-latest}"
+HERMES_NAME="${HERMES_NAME:-hermes}"
+HERMES_NETWORK="${HERMES_NETWORK:-agentnet}"
+HERMES_CONFIG="${HERMES_CONFIG:-/etc/hermes/config.yaml}"
+HERMES_RESTART="${HERMES_RESTART:-unless-stopped}"   # set to "no" for the first test
+HERMES_MEMORY="${HERMES_MEMORY:-16g}"
+HERMES_CPUS="${HERMES_CPUS:-4}"
+HERMES_PIDS_LIMIT="${HERMES_PIDS_LIMIT:-512}"
+
+IMAGE="hermes-guest:${HERMES_VERSION}"
+
+if [[ "$HERMES_VERSION" == "latest" ]]; then
+  echo "WARNING: running from :latest. Set HERMES_VERSION to the scanned tag before production." >&2
+fi
+
+if ! docker network inspect "${HERMES_NETWORK}" >/dev/null 2>&1; then
+  echo "ERROR: Docker network '${HERMES_NETWORK}' does not exist." >&2
+  exit 1
+fi
+
+if [[ ! -f "${HERMES_CONFIG}" ]]; then
+  echo "ERROR: config file '${HERMES_CONFIG}' not found." >&2
+  exit 1
+fi
+
+if ! docker image inspect "${IMAGE}" >/dev/null 2>&1; then
+  echo "ERROR: image '${IMAGE}' not found locally." >&2
+  exit 1
+fi
+
+if docker ps -a --format '{{.Names}}' | grep -qx "${HERMES_NAME}"; then
+  echo "ERROR: container '${HERMES_NAME}' already exists. Remove it first:" >&2
+  echo "  docker stop '${HERMES_NAME}' && docker rm '${HERMES_NAME}'" >&2
+  exit 1
+fi
+
+docker run -d \
+  --name "${HERMES_NAME}" \
+  --init \
+  --hostname hermes \
+  --network "${HERMES_NETWORK}" \
+  --gpus all \
+  --user 1000:1000 \
+  --cap-drop ALL \
+  --security-opt no-new-privileges \
+  --read-only \
+  --tmpfs /tmp:rw,nosuid,nodev,noexec,size=256m \
+  --tmpfs /run:rw,nosuid,nodev,noexec,size=64m \
+  --mount type=volume,source=hermes-state,destination=/home/hermes/.hermes \
+  --mount type=bind,source="${HERMES_CONFIG}",destination=/home/hermes/.hermes/config.yaml,readonly \
+  --pids-limit "${HERMES_PIDS_LIMIT}" \
+  --memory "${HERMES_MEMORY}" \
+  --cpus "${HERMES_CPUS}" \
+  --restart "${HERMES_RESTART}" \
+  -e HERMES_HOME=/home/hermes/.hermes \
+  -e HTTPS_PROXY=http://172.30.0.1:8888 \
+  -e HTTP_PROXY=http://172.30.0.1:8888 \
+  -e NO_PROXY=172.30.0.1 \
+  "${IMAGE}"
+
+echo "Hermes container '${HERMES_NAME}' started from ${IMAGE}."
+echo "Smoke test: docker exec ${HERMES_NAME} nvidia-smi"

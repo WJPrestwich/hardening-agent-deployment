@@ -1,0 +1,40 @@
+[Unit]
+Description=Pipelock egress proxy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=pipelock
+Group=pipelock
+ExecStart=/usr/local/bin/pipelock run --config /etc/pipelock/config.yaml
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectKernelLogs=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+ProcSubset=pid
+LockPersonality=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+MemoryDenyWriteExecute=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_INET AF_INET6
+ReadOnlyPaths=/etc/pipelock
+ReadWritePaths=/var/lib/pipelock /var/log/pipelock
+UMask=0077
+StandardOutput=append:/var/log/pipelock/pipelock.log
+StandardError=append:/var/log/pipelock/pipelock.log
+
+[Install]
+WantedBy=multi-user.target

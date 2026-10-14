@@ -1,0 +1,10 @@
+/var/log/pipelock/events.log {
+  daily
+  rotate 30
+  compress
+  delaycompress
+  missingok
+  notifempty
+  su root syslog
+  create 0640 syslog adm
+}

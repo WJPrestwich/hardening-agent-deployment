@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# Start the hardened Hermes container with the vLLM-extended image.
+# This is the same as assets/hermes-run with three additions:
+#   - uses the hermes-guest:vllm-${VLLM_VERSION} image
+#   - mounts the read-only model directory at /models
+#   - adds --shm-size for vLLM inter-process communication
+
+set -euo pipefail
+
+HERMES_VERSION="${HERMES_VERSION:-X.Y.Z}"       # base Hermes image tag; must match the scanned base
+VLLM_VERSION="${VLLM_VERSION:-A.B.C}"           # vLLM extension tag you built and scanned
+HERMES_NAME="${HERMES_NAME:-hermes}"
+HERMES_NETWORK="${HERMES_NETWORK:-agentnet}"
+HERMES_CONFIG="${HERMES_CONFIG:-/etc/hermes/config.yaml}"
+HERMES_RESTART="${HERMES_RESTART:-unless-stopped}"   # set to "no" for the first smoke test
+HERMES_MEMORY="${HERMES_MEMORY:-24g}"
+HERMES_CPUS="${HERMES_CPUS:-4}"
+HERMES_PIDS_LIMIT="${HERMES_PIDS_LIMIT:-512}"
+MODELS_DIR="${MODELS_DIR:-/opt/models}"
+SHM_SIZE="${SHM_SIZE:-8g}"
+
+IMAGE="hermes-guest:vllm-${VLLM_VERSION}"
+
+if [[ "${HERMES_VERSION}" == "X.Y.Z" || "${VLLM_VERSION}" == "A.B.C" ]]; then
+  echo "ERROR: set HERMES_VERSION and VLLM_VERSION to the scanned tags you built." >&2
+  exit 1
+fi
+
+if ! docker network inspect "${HERMES_NETWORK}" >/dev/null 2>&1; then
+  echo "ERROR: Docker network '${HERMES_NETWORK}' does not exist." >&2
+  exit 1
+fi
+
+if [[ ! -f "${HERMES_CONFIG}" ]]; then
+  echo "ERROR: config file '${HERMES_CONFIG}' not found." >&2
+  exit 1
+fi
+
+if ! docker image inspect "${IMAGE}" >/dev/null 2>&1; then
+  echo "ERROR: image '${IMAGE}' not found locally." >&2
+  exit 1
+fi
+
+if docker ps -a --format '{{.Names}}' | grep -qx "${HERMES_NAME}"; then
+  echo "ERROR: container '${HERMES_NAME}' already exists. Remove it first:" >&2
+  echo "  docker stop '${HERMES_NAME}' && docker rm '${HERMES_NAME}'" >&2
+  exit 1
+fi
+
+if [[ ! -d "${MODELS_DIR}" ]]; then
+  echo "ERROR: models directory '${MODELS_DIR}' does not exist." >&2
+  exit 1
+fi
+
+docker run -d \
+  --name "${HERMES_NAME}" \
+  --init \
+  --hostname hermes \
+  --network "${HERMES_NETWORK}" \
+  --gpus all \
+  --user 1000:1000 \
+  --cap-drop ALL \
+  --security-opt no-new-privileges \
+  --read-only \
+  --shm-size "${SHM_SIZE}" \
+  --tmpfs /tmp:rw,nosuid,nodev,noexec,size=512m \
+  --tmpfs /run:rw,nosuid,nodev,noexec,size=64m \
+  --mount type=volume,source=hermes-state,destination=/home/hermes/.hermes \
+  --mount type=bind,source="${HERMES_CONFIG}",destination=/home/hermes/.hermes/config.yaml,readonly \
+  --mount type=bind,source="${MODELS_DIR}",destination=/models,readonly \
+  --pids-limit "${HERMES_PIDS_LIMIT}" \
+  --memory "${HERMES_MEMORY}" \
+  --cpus "${HERMES_CPUS}" \
+  --restart "${HERMES_RESTART}" \
+  -e HERMES_HOME=/home/hermes/.hermes \
+  -e HF_HOME=/tmp/hf \
+  -e HTTPS_PROXY=http://172.30.0.1:8888 \
+  -e HTTP_PROXY=http://172.30.0.1:8888 \
+  -e NO_PROXY=127.0.0.1,172.30.0.1 \
+  "${IMAGE}"
+
+echo "Hermes vLLM container '${HERMES_NAME}' started from ${IMAGE}."
+echo "Next: run assets/start-vllm.sh from the host to start vLLM inside the container."
+echo "Smoke test: docker exec ${HERMES_NAME} nvidia-smi"
